@@ -3,6 +3,12 @@
 See [ROBOT_SYSTEM.md](ROBOT_SYSTEM.md) for the in-depth robot, software, calibration, and
 commissioning reference.
 
+## Official FTC rules and resources
+
+Use [FTC Resources](https://ftc-resources.firstinspires.org/) to look up the current season's rules,
+game manuals, and official competition resources. Check the applicable season and manual before
+making rule-dependent robot changes.
+
 ## Hardware names
 
 Create these exact names in the Robot Configuration: `frontLeft`, `frontRight`, `backLeft`,
