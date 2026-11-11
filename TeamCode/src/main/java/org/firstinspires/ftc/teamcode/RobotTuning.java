@@ -6,23 +6,25 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import java.util.Locale;
 
 /**
- * Bring-up utility. Use D-pad up/down to select a value and left/right to adjust it.
+ * Bring-up utility. Use Gamepad 2 D-pad up/down to select a value and left/right to adjust it.
  * X selects fine steps, Y selects coarse steps. Hold Gamepad 1 A to spin up the launcher.
+ * Start it with the slide retracted and the turret at home: it zeroes both encoders.
  * Adjusted values are live for the current controller session; copy the reported Java values into
  * RobotConfig so they survive an app restart. Keep the robot clear when enabling manual outputs.
  */
 @TeleOp(name = "BioBuzz Tuning", group = "BioBuzz")
 public class RobotTuning extends OpMode {
     private RobotHardware robot;
+    private Slide slide;
+    private Turret turret;
+    private Shooter shooter;
     private int selected;
     private double rampLeftPosition;
     private double rampRightPosition;
-    private double gatePosition;
     private boolean previousUp;
     private boolean previousDown;
     private boolean previousLeft;
     private boolean previousRight;
-    private boolean launcherPowerOn;
 
     private final String[] names = {
             "SLIDE_MAX_TICKS", "SLIDE_FLOWER_TICKS", "SLIDE_KP",
@@ -36,16 +38,21 @@ public class RobotTuning extends OpMode {
     public void init() {
         robot = new RobotHardware(hardwareMap);
         robot.initialize();
+        // Tuning always starts from a fresh zero: put the slide and turret at home first.
+        robot.rezeroMechanisms();
+        slide = new Slide(robot);
+        turret = new Turret(robot);
+        shooter = new Shooter(robot);
         robot.limelight.start();
         rampLeftPosition = RobotConfig.RAMP_LEFT_STOW;
         rampRightPosition = RobotConfig.RAMP_RIGHT_STOW;
-        gatePosition = RobotConfig.GATE_CLOSED;
         telemetry.addLine("Tuning mode ready. D-pad selects/adjusts; X fine, Y coarse.");
         telemetry.update();
     }
 
     @Override
     public void loop() {
+        robot.clearBulkCache();
         if (gamepad2.dpad_up && !previousUp) selected = (selected + names.length - 1) % names.length;
         if (gamepad2.dpad_down && !previousDown) selected = (selected + 1) % names.length;
         double step = gamepad2.y ? 10.0 : (gamepad2.x ? 0.1 : 1.0);
@@ -58,48 +65,29 @@ public class RobotTuning extends OpMode {
 
         if (gamepad2.left_bumper) {
             rampLeftPosition = clamp01(rampLeftPosition + gamepad2.right_stick_y * 0.005);
-            robot.rampLeft.setPosition(rampLeftPosition);
         }
         if (gamepad2.right_bumper) {
             rampRightPosition = clamp01(rampRightPosition + gamepad2.right_stick_y * 0.005);
         }
+        robot.rampLeft.setPosition(rampLeftPosition);
+        robot.rampRight.setPosition(rampRightPosition);
+
+        // Same soft limits and power scaling as TeleOp's manual mode.
         if (gamepad2.left_stick_button) {
-            double p = -gamepad2.left_stick_y * RobotConfig.SLIDE_MANUAL_POWER;
-            int pos = robot.backboardSlide.getCurrentPosition();
-            if ((pos <= 0 && p < 0) || (pos >= RobotConfig.SLIDE_MAX_TICKS && p > 0)) p = 0;
-            robot.backboardSlide.setPower(p);
-        } else robot.backboardSlide.setPower(0.0);
-        if (gamepad2.right_stick_button) {
-            double turretDegrees = RobotConfig.TURRET_TICKS_PER_REVOLUTION <= 0.0 ? 0.0
-                    : robot.turret.getCurrentPosition() * 360.0 / RobotConfig.TURRET_TICKS_PER_REVOLUTION;
-            double power = gamepad2.right_stick_x * RobotConfig.TURRET_MANUAL_POWER;
-            if ((turretDegrees <= -RobotConfig.TURRET_LIMIT_DEGREES && power < 0)
-                    || (turretDegrees >= RobotConfig.TURRET_LIMIT_DEGREES && power > 0)) power = 0;
-            robot.turret.setPower(power);
-        } else robot.turret.setPower(0.0);
-        if (gamepad1.a) {
-            double rpm = launcherRpm();
-            if (RobotConfig.LAUNCHER_CONTINUOUS_VELOCITY_HOLD) {
-                double error = RobotConfig.LAUNCHER_TARGET_RPM - rpm;
-                robot.launcher.setPower(Math.max(0.0, Math.min(1.0,
-                        RobotConfig.LAUNCHER_POWER + error * RobotConfig.LAUNCHER_CONTINUOUS_KP)));
-            } else {
-                if (!launcherPowerOn && rpm <= RobotConfig.LAUNCHER_TARGET_RPM
-                        * RobotConfig.LAUNCHER_RESTART_RPM_FRACTION) launcherPowerOn = true;
-                if (launcherPowerOn && rpm >= RobotConfig.LAUNCHER_TARGET_RPM
-                        * RobotConfig.LAUNCHER_CUTOFF_RPM_FRACTION) launcherPowerOn = false;
-                robot.launcher.setPower(launcherPowerOn ? RobotConfig.LAUNCHER_POWER : 0.0);
-            }
+            slide.manual(MecanumMath.deadband(-gamepad2.left_stick_y, RobotConfig.STICK_DEADBAND));
         } else {
-            launcherPowerOn = false;
-            robot.launcher.setPower(0.0);
+            slide.stop();
         }
-        robot.intake.setPower(0.0);
-        robot.rampLeft.setPosition(clamp01(rampLeftPosition));
-        robot.rampRight.setPosition(clamp01(rampRightPosition));
-        double readyRpm = RobotConfig.LAUNCHER_TARGET_RPM * RobotConfig.LAUNCHER_READY_RPM_FRACTION;
-        robot.launcherGate.setPosition(gamepad2.b && launcherRpm() >= readyRpm
-                ? clamp01(gatePosition) : clamp01(RobotConfig.GATE_CLOSED));
+        if (gamepad2.right_stick_button) {
+            turret.manual(MecanumMath.deadband(gamepad2.right_stick_x, RobotConfig.STICK_DEADBAND));
+        } else {
+            turret.stop();
+        }
+
+        // Same launcher control as TeleOp. The gate opens to GATE_OPEN only at ready speed.
+        shooter.setSpinning(gamepad1.a);
+        shooter.setManualGate(gamepad2.b);
+        shooter.update(System.nanoTime() / 1.0e9);
 
         telemetry.addData("Selected", "%s (%d/%d)", names[selected], selected + 1, names.length);
         telemetry.addData("Current", "%.4f", value(selected));
@@ -107,9 +95,10 @@ public class RobotTuning extends OpMode {
         telemetry.addLine("Hold LB/RB + right stick Y to jog left/right ramp servos.");
         telemetry.addLine("Hold Gamepad 2 left/right stick button to enable slide/turret manual control.");
         telemetry.addLine("Hold Gamepad 2 B to test gate open after launcher reaches ready speed.");
-        telemetry.addData("Slide encoder", robot.backboardSlide.getCurrentPosition());
-        telemetry.addData("Turret encoder", robot.turret.getCurrentPosition());
-        telemetry.addData("Launcher RPM", "%.0f", launcherRpm());
+        telemetry.addData("Slide encoder", slide.position());
+        telemetry.addData("Turret encoder", "%d ticks = %.1f deg",
+                robot.turret.getCurrentPosition(), turret.degrees());
+        telemetry.addData("Launcher RPM", "%.0f (ready=%s)", shooter.rpm(), shooter.ready());
         telemetry.addData("Ramp servo positions", "L %.3f / R %.3f", rampLeftPosition, rampRightPosition);
         telemetry.addData("Copy value", "RobotConfig.%s = %s;", names[selected], copyValue());
         telemetry.update();
@@ -124,8 +113,8 @@ public class RobotTuning extends OpMode {
 
     private void adjust(double delta) {
         switch (selected) {
-            case 0: RobotConfig.SLIDE_MAX_TICKS = Math.max(1, RobotConfig.SLIDE_MAX_TICKS + (int) delta); break;
-            case 1: RobotConfig.SLIDE_FLOWER_TICKS = Math.max(0, RobotConfig.SLIDE_FLOWER_TICKS + (int) delta); break;
+            case 0: RobotConfig.SLIDE_MAX_TICKS = Math.max(1, RobotConfig.SLIDE_MAX_TICKS + wholeStep(delta)); break;
+            case 1: RobotConfig.SLIDE_FLOWER_TICKS = Math.max(0, RobotConfig.SLIDE_FLOWER_TICKS + wholeStep(delta)); break;
             case 2: RobotConfig.SLIDE_KP = Math.max(0.0, RobotConfig.SLIDE_KP + delta * 0.0001); break;
             case 3: RobotConfig.TURRET_TICKS_PER_REVOLUTION = Math.max(1.0, RobotConfig.TURRET_TICKS_PER_REVOLUTION + delta); break;
             case 4: RobotConfig.TURRET_LIMIT_DEGREES = Math.max(1.0, RobotConfig.TURRET_LIMIT_DEGREES + delta); break;
@@ -135,8 +124,8 @@ public class RobotTuning extends OpMode {
             case 8: RobotConfig.RAMP_LEFT_LEVEL = clamp01(RobotConfig.RAMP_LEFT_LEVEL + delta * 0.01); rampLeftPosition = RobotConfig.RAMP_LEFT_LEVEL; break;
             case 9: RobotConfig.RAMP_RIGHT_STOW = clamp01(RobotConfig.RAMP_RIGHT_STOW + delta * 0.01); rampRightPosition = RobotConfig.RAMP_RIGHT_STOW; break;
             case 10: RobotConfig.RAMP_RIGHT_LEVEL = clamp01(RobotConfig.RAMP_RIGHT_LEVEL + delta * 0.01); rampRightPosition = RobotConfig.RAMP_RIGHT_LEVEL; break;
-            case 11: RobotConfig.GATE_CLOSED = clamp01(RobotConfig.GATE_CLOSED + delta * 0.01); gatePosition = RobotConfig.GATE_CLOSED; break;
-            case 12: RobotConfig.GATE_OPEN = clamp01(RobotConfig.GATE_OPEN + delta * 0.01); gatePosition = RobotConfig.GATE_OPEN; break;
+            case 11: RobotConfig.GATE_CLOSED = clamp01(RobotConfig.GATE_CLOSED + delta * 0.01); break;
+            case 12: RobotConfig.GATE_OPEN = clamp01(RobotConfig.GATE_OPEN + delta * 0.01); break;
             case 13: RobotConfig.LAUNCHER_TICKS_PER_REVOLUTION = Math.max(1.0, RobotConfig.LAUNCHER_TICKS_PER_REVOLUTION + delta); break;
             case 14: RobotConfig.LAUNCHER_TARGET_RPM = Math.max(0.0, RobotConfig.LAUNCHER_TARGET_RPM + delta * 25.0); break;
             case 15: RobotConfig.FEED_OPEN_SECONDS = Math.max(0.01, RobotConfig.FEED_OPEN_SECONDS + delta * 0.01); break;
@@ -173,9 +162,11 @@ public class RobotTuning extends OpMode {
         return String.format(Locale.US, "%.4f", value(selected));
     }
 
-    private double launcherRpm() {
-        return RobotConfig.LAUNCHER_TICKS_PER_REVOLUTION <= 0.0 ? 0.0
-                : Math.abs(robot.launcher.getVelocity()) * 60.0 / RobotConfig.LAUNCHER_TICKS_PER_REVOLUTION;
+    /** Tick values only move in whole steps, so a fine step still changes them by one. */
+    private static int wholeStep(double delta) {
+        int rounded = (int) Math.round(delta);
+        if (rounded != 0) return rounded;
+        return delta > 0.0 ? 1 : -1;
     }
 
     private static double clamp01(double value) {

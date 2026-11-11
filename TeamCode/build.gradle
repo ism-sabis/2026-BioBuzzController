@@ -27,4 +27,6 @@ android {
 dependencies {
     implementation project(':FtcRobotController')
     implementation 'com.pedropathing:ftc:2.1.2'
+    // Laptop-only unit tests for the logic classes (MecanumMath, TurretMath, FeedSequencer).
+    testImplementation 'junit:junit:4.13.2'
 }

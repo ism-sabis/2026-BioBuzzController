@@ -13,36 +13,47 @@ making rule-dependent robot changes.
 
 Create these exact names in the Robot Configuration: `frontLeft`, `frontRight`, `backLeft`,
 `backRight`, `intake`, `turret`, `backboardSlide`, `launcher`, `rampLeft`, `rampRight`,
-`launcherGate`, `odoLeft`, `odoRight`, `imu`, and `limelight`. The four drive motors, intake,
-turret, slide, launcher, and odometry encoders are mapped as `DcMotorEx`; the two ramp servos and
-gate are `Servo` devices.
+`launcherGate`, `imu`, and `limelight`. The eight motors are mapped as `DcMotorEx`; the two ramp
+servos and gate are `Servo` devices. If any name is missing, init stops with one error listing all
+of them.
 
-The controller assumes the slide is fully retracted and turret is at its known home angle when an
-OpMode initializes. It resets both encoder references at that moment. Keep the mechanism at home
-before starting either driver or tuning mode. The IMU orientation in `RobotHardware` assumes its
-logo faces up and USB faces forward; change it to match the installed Hub.
+The two odometry pods (one forward, one strafe) are not separate devices. Each plugs into the
+encoder port of a drive motor or the intake motor; put that motor's name in
+`RobotConfig.FORWARD_POD_MOTOR_NAME` / `STRAFE_POD_MOTOR_NAME`. Leave them empty until the ports
+are decided.
+
+The controller assumes the slide is fully retracted and turret is at its known home angle the
+first time an OpMode initializes after the app starts, and zeroes both encoders then. Later OpModes
+keep that zero. To zero them again, put both at home and press Gamepad 1 `X` during TeleOp init.
+The IMU orientation in `RobotHardware` assumes its logo faces up and USB faces forward; change it
+to match the installed Hub.
 
 ## Driver controls
 
-Gamepad 1 sticks drive. `Y` switches between field and robot centric drive. During init, D-pad left
-selects Red and right selects Blue. Hold `Start` to override the Flower lockout.
+Gamepad 1 sticks drive. Hold `RB` for slow mode. `Y` switches between field and robot centric
+drive, and `Back` resets the field centric heading to the way the robot is facing. During init,
+D-pad left selects Red and right selects Blue, and `X` re-zeroes the slide and turret. Hold `Start`
+to override the Flower lockout.
 
 Gamepad 2 `A`, `B`, `X`, and `Y` request one, two, three, and four balls. `LB` toggles Flower mode;
 `RB` toggles the ramp between stowed and level. Hold the left stick button to enable manual control:
 the left stick moves the slide, right stick moves the turret, D-pad up/down deploys/stows the ramp,
 and D-pad right/left opens/closes the gate. The gate opens only while launcher speed is ready. Any
-manual mechanism input cancels queued feeds. `Back` cancels feeding and disables launcher hold.
+manual mechanism input cancels queued feeds. `Back` cancels feeding and switches the launcher off.
+After a manual move the slide and turret hold where they were released.
 
 Flower activation is locked until the final 60 seconds of a 120-second TeleOp by default. Set
 `RobotConfig.FLOWER_LOCKOUT_ENABLED` false to disable that lockout. Ramp movement is independent of
 Flower mode.
 
-Limelight selection expects the chosen pipeline to show HIVE fiducials only. The current tracking
-code uses the largest detected tag area as a nearest-tag approximation and retains its last angle
-after detections disappear. Set the Red and Blue pipeline indexes in `RobotConfig` to match the
-Limelight configuration.
+The Limelight is mounted on the turret. The turret only aims at your alliance's HIVE tags: IDs
+30-37 on Red and 38-45 on Blue (`RED_TAG_MIN_ID`/`MAX_ID` and `BLUE_TAG_MIN_ID`/`MAX_ID` in
+`RobotConfig`). Narrow a range to one sticker's four IDs to aim at a single CELL. Tracking keeps
+its last angle after detections disappear. Set the Red and Blue pipeline indexes to match the Limelight configuration.
 
 ## Calibration
+
+Run `Motor Test` first with the wheels off the ground to check each drive motor's direction.
 
 Run `BioBuzz Tuning` with the slide retracted and turret at home. D-pad up/down selects a value;
 D-pad left/right changes it. Hold `X` for fine steps and `Y` for coarse steps. Hold Gamepad 2 left
