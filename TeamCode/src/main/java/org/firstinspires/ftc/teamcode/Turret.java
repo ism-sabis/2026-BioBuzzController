@@ -14,6 +14,7 @@ public final class Turret {
     private boolean tagVisible;
     private int lastTagId = -1;
     private double lastTx;
+    private double lastPowerRequest;
 
     public Turret(RobotHardware robot) {
         this.robot = robot;
@@ -46,6 +47,11 @@ public final class Turret {
         return lastTx;
     }
 
+    /** Last normalized power sent to the turret motor, for tuning telemetry. */
+    public double lastPowerRequest() {
+        return lastPowerRequest;
+    }
+
     /**
      * Points the target at a goal tag. The target only moves when a new camera frame arrives:
      * re-using an old frame while the turret is already turning made it overshoot. With no tag
@@ -56,6 +62,7 @@ public final class Turret {
      */
     public void trackTag(int minTagId, int maxTagId) {
         tagVisible = false;
+        if (robot.limelight == null) return;
         LLResult result = robot.limelight.getLatestResult();
         if (result == null || !result.isValid()) return;
         double stalenessMs = result.getStaleness();
@@ -85,8 +92,9 @@ public final class Turret {
      */
     public void manual(double stick) {
         double current = degrees();
-        robot.turret.setPower(TurretMath.limitPower(stick * RobotConfig.TURRET_MANUAL_POWER,
-                current, RobotConfig.TURRET_LIMIT_DEGREES));
+        lastPowerRequest = TurretMath.limitPower(stick * RobotConfig.TURRET_MANUAL_POWER,
+                current, RobotConfig.TURRET_LIMIT_DEGREES);
+        robot.turret.setPower(lastPowerRequest);
         targetDegrees = TurretMath.boundTarget(current, RobotConfig.TURRET_LIMIT_DEGREES);
     }
 
@@ -94,12 +102,14 @@ public final class Turret {
     public void update() {
         double current = degrees();
         double power = TurretMath.positionPower(targetDegrees - current, RobotConfig.TURRET_KP,
-                RobotConfig.TURRET_MAX_POWER, RobotConfig.TURRET_TOLERANCE_DEGREES);
-        robot.turret.setPower(TurretMath.limitPower(power, current,
-                RobotConfig.TURRET_LIMIT_DEGREES));
+                RobotConfig.TURRET_MAX_POWER, RobotConfig.TURRET_TOLERANCE_DEGREES,
+                RobotConfig.TURRET_MIN_POWER);
+        lastPowerRequest = TurretMath.limitPower(power, current, RobotConfig.TURRET_LIMIT_DEGREES);
+        robot.turret.setPower(lastPowerRequest);
     }
 
     public void stop() {
-        robot.turret.setPower(0.0);
+        lastPowerRequest = 0.0;
+        robot.turret.setPower(lastPowerRequest);
     }
 }

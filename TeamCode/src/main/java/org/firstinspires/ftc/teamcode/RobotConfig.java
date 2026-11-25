@@ -34,9 +34,13 @@ public final class RobotConfig {
     public static double TURRET_LIMIT_DEGREES = 360.0;
     public static double TURRET_FLOWER_DEGREES = 45.0;
     public static double TURRET_KP = 0.0060;
+    /** Minimum automatic power outside the target tolerance; leave at zero until measured. */
+    public static double TURRET_MIN_POWER = 0.0;
     public static double TURRET_MAX_POWER = 0.45;
     public static double TURRET_MANUAL_POWER = 0.30;
     public static double TURRET_TOLERANCE_DEGREES = 0.5;
+    /** Small relative target step used by BioBuzz Tuning for proportional-response checks. */
+    public static double TURRET_TEST_STEP_DEGREES = 1.0;
 
     // ---- Limelight aiming (camera is mounted on the turret and turns with it) ----
     /** Turret degrees per degree of Limelight tx. Make it negative if the turret turns away. */
@@ -58,13 +62,16 @@ public final class RobotConfig {
     public static int BLUE_LIMELIGHT_PIPELINE = 0;
 
     // ---- Ramp and gate servos ----
-    // The left and right servos are mirrored on the assembly, so calibrate each separately.
+    // The left and right servos are mirrored and mechanically linked.
+    // RobotTuning pairs the ramp endpoints and sets each right target to 1.0 minus the left target.
     public static double RAMP_LEFT_STOW = 0.14;
     public static double RAMP_LEFT_LEVEL = 0.483;
     public static double RAMP_RIGHT_STOW = 0.86;
     public static double RAMP_RIGHT_LEVEL = 0.517;
-    public static double GATE_CLOSED = 0.12;
-    public static double GATE_OPEN = 0.72;
+    public static double GATE_CLOSED = 0.11;
+    public static double GATE_OPEN = 0.38;
+    /** -1 leaves the hood untouched until it is calibrated; otherwise this is the saved 0..1 target. */
+    public static double HOOD_POSITION = -1.0;
 
     // ---- Launcher ----
     /** Encoder ticks per revolution of the bare motor shaft (28 for goBILDA Yellow Jacket). */

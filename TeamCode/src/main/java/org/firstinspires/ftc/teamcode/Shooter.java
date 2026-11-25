@@ -6,6 +6,7 @@ public final class Shooter {
     private final FeedSequencer feed = new FeedSequencer();
     private boolean spinning;
     private boolean manualGateOpen;
+    private boolean manualGateBypassReady;
 
     public Shooter(RobotHardware robot) {
         this.robot = robot;
@@ -15,6 +16,7 @@ public final class Shooter {
     public void startFeed(int balls) {
         spinning = true;
         manualGateOpen = false;
+        manualGateBypassReady = false;
         feed.start(balls);
     }
 
@@ -27,6 +29,7 @@ public final class Shooter {
     public void shutDown() {
         feed.cancel();
         manualGateOpen = false;
+        manualGateBypassReady = false;
         spinning = false;
     }
 
@@ -38,13 +41,21 @@ public final class Shooter {
         return spinning;
     }
 
-    /** Manual gate request. The gate still only opens while the launcher is at speed. */
+    /** Normal manual gate request; opening still waits for launcher-ready speed. */
     public void setManualGate(boolean open) {
         manualGateOpen = open;
+        manualGateBypassReady = false;
+    }
+
+    /** Manual gate control for bench tuning; opening is allowed at any launcher speed. */
+    public void setManualGateForTesting(boolean open) {
+        manualGateOpen = open;
+        manualGateBypassReady = open;
     }
 
     public boolean gateOpen() {
-        return feed.gateOpen() || (feed.isIdle() && manualGateOpen && ready());
+        return feed.gateOpen() || (feed.isIdle() && manualGateOpen
+                && (manualGateBypassReady || ready()));
     }
 
     public double rpm() {

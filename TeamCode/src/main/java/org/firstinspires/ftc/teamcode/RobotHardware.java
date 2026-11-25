@@ -5,6 +5,7 @@ import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -36,6 +37,9 @@ public final class RobotHardware {
     public final Servo rampLeft;
     public final Servo rampRight;
     public final Servo launcherGate;
+    public final Servo hood;
+    public final DigitalChannel odometryLeft;
+    public final DigitalChannel odometryRight;
     public final IMU imu;
     public final Limelight3A limelight;
 
@@ -58,8 +62,12 @@ public final class RobotHardware {
         rampLeft = find(hardwareMap, Servo.class, "rampLeft");
         rampRight = find(hardwareMap, Servo.class, "rampRight");
         launcherGate = find(hardwareMap, Servo.class, "launcherGate");
+        hood = find(hardwareMap, Servo.class, "hood");
+        odometryLeft = find(hardwareMap, DigitalChannel.class, "odometryLeft");
+        odometryRight = find(hardwareMap, DigitalChannel.class, "odometryRight");
         imu = find(hardwareMap, IMU.class, "imu");
-        limelight = find(hardwareMap, Limelight3A.class, "limelight");
+        // The camera is optional during bring-up; other mechanisms remain testable without it.
+        limelight = hardwareMap.tryGet(Limelight3A.class, "limelight");
         if (!missing.isEmpty()) {
             throw new IllegalStateException("Robot Configuration is missing (or has the wrong "
                     + "type for): " + missing + ". Names must match exactly.");
@@ -94,10 +102,12 @@ public final class RobotHardware {
         // One bulk read per hub per loop instead of one hub call per encoder read.
         for (LynxModule hub : hubs) hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
 
-        frontLeft.setDirection(DcMotor.Direction.REVERSE);
+        // Motor Test showed BL was already correct; FL, FR and BR spun backward when
+        // commanded to roll forward, so reverse those three mounting directions.
+        frontLeft.setDirection(DcMotor.Direction.FORWARD);
+        frontRight.setDirection(DcMotor.Direction.REVERSE);
         backLeft.setDirection(DcMotor.Direction.REVERSE);
-        frontRight.setDirection(DcMotor.Direction.FORWARD);
-        backRight.setDirection(DcMotor.Direction.FORWARD);
+        backRight.setDirection(DcMotor.Direction.REVERSE);
         for (DcMotorEx motor : new DcMotorEx[] {frontLeft, frontRight, backLeft, backRight}) {
             motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -114,6 +124,7 @@ public final class RobotHardware {
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backboardSlide.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        launcher.setDirection(DcMotor.Direction.REVERSE);
         launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         // The flywheel must coast when power is cut; braking it wastes the spin-up.
         launcher.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
@@ -125,7 +136,13 @@ public final class RobotHardware {
         stopAllMotors();
         rampLeft.setPosition(RobotConfig.RAMP_LEFT_STOW);
         rampRight.setPosition(RobotConfig.RAMP_RIGHT_STOW);
-        launcherGate.setPosition(RobotConfig.GATE_CLOSED);
+        // Start open during INIT; Shooter.update() moves it to GATE_CLOSED after start.
+        launcherGate.setPosition(Ramp.clamp01(RobotConfig.GATE_OPEN));
+        if (RobotConfig.HOOD_POSITION >= 0.0 && RobotConfig.HOOD_POSITION <= 1.0) {
+            hood.setPosition(RobotConfig.HOOD_POSITION);
+        }
+        odometryLeft.setMode(DigitalChannel.Mode.INPUT);
+        odometryRight.setMode(DigitalChannel.Mode.INPUT);
 
         imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,

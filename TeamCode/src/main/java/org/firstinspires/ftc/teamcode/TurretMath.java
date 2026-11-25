@@ -44,8 +44,20 @@ public final class TurretMath {
     /** Proportional power toward a target: zero inside the tolerance, capped at maxPower. */
     public static double positionPower(double error, double kp, double maxPower,
                                        double tolerance) {
-        if (Math.abs(error) <= tolerance) return 0.0;
+        return positionPower(error, kp, maxPower, tolerance, 0.0);
+    }
+
+    /** Apply a minimum output outside tolerance to overcome static friction. */
+    public static double positionPower(double error, double kp, double maxPower,
+                                       double tolerance, double minPower) {
+        if (Math.abs(error) <= Math.abs(tolerance)) return 0.0;
         double cap = Math.abs(maxPower);
-        return Math.max(-cap, Math.min(cap, error * kp));
+        if (cap == 0.0) return 0.0;
+        double power = Math.max(-cap, Math.min(cap, error * kp));
+        double floor = Math.min(Math.abs(minPower), cap);
+        if (Math.abs(power) < floor) {
+            power = Math.copySign(floor, power == 0.0 ? error : power);
+        }
+        return power;
     }
 }

@@ -54,4 +54,12 @@ public class TurretMathTest {
         assertEquals(-0.45, TurretMath.positionPower(-300.0, 0.006, 0.45, 0.5), EPS);
         assertEquals(0.0, TurretMath.positionPower(0.4, 0.006, 0.45, 0.5), EPS);
     }
+
+    @Test
+    public void positionPowerUsesMinimumOnlyOutsideToleranceAndWithinMaximum() {
+        assertEquals(0.08, TurretMath.positionPower(1.0, 0.006, 0.45, 0.5, 0.08), EPS);
+        assertEquals(-0.08, TurretMath.positionPower(-1.0, 0.006, 0.45, 0.5, 0.08), EPS);
+        assertEquals(0.0, TurretMath.positionPower(0.4, 0.006, 0.45, 0.5, 0.08), EPS);
+        assertEquals(0.10, TurretMath.positionPower(300.0, 0.006, 0.10, 0.5, 0.25), EPS);
+    }
 }

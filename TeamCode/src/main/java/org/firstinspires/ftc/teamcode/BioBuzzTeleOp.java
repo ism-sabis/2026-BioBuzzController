@@ -41,8 +41,10 @@ public class BioBuzzTeleOp extends LinearOpMode {
         turret = new Turret(robot);
         shooter = new Shooter(robot);
         ramp = new Ramp(robot);
-        robot.limelight.pipelineSwitch(RobotConfig.BLUE_LIMELIGHT_PIPELINE);
-        robot.limelight.start();
+        if (robot.limelight != null) {
+            robot.limelight.pipelineSwitch(RobotConfig.BLUE_LIMELIGHT_PIPELINE);
+            robot.limelight.start();
+        }
 
         while (!isStarted() && !isStopRequested()) {
             robot.clearBulkCache();
@@ -72,7 +74,7 @@ public class BioBuzzTeleOp extends LinearOpMode {
             idle();
         }
         if (isStopRequested()) {
-            robot.limelight.stop();
+            if (robot.limelight != null) robot.limelight.stop();
             return;
         }
 
@@ -94,14 +96,16 @@ public class BioBuzzTeleOp extends LinearOpMode {
         }
         robot.stopAllMotors();
         robot.launcherGate.setPosition(Ramp.clamp01(RobotConfig.GATE_CLOSED));
-        robot.limelight.stop();
+        if (robot.limelight != null) robot.limelight.stop();
     }
 
     private void setAlliance(Alliance nextAlliance) {
         if (alliance == nextAlliance) return;
         alliance = nextAlliance;
-        robot.limelight.pipelineSwitch(nextAlliance == Alliance.RED
-                ? RobotConfig.RED_LIMELIGHT_PIPELINE : RobotConfig.BLUE_LIMELIGHT_PIPELINE);
+        if (robot.limelight != null) {
+            robot.limelight.pipelineSwitch(nextAlliance == Alliance.RED
+                    ? RobotConfig.RED_LIMELIGHT_PIPELINE : RobotConfig.BLUE_LIMELIGHT_PIPELINE);
+        }
     }
 
     private int minTagId() {
@@ -215,7 +219,8 @@ public class BioBuzzTeleOp extends LinearOpMode {
         telemetry.addData("Turret", "%.1f deg, target %.1f, limit %.1f", turret.degrees(),
                 turret.target(), RobotConfig.TURRET_LIMIT_DEGREES);
         telemetry.addData("Goal tag", "IDs %d-%d, %s", minTagId(), maxTagId(),
-                turret.tagVisible()
+                robot.limelight == null ? "Limelight not configured"
+                        : turret.tagVisible()
                         ? String.format("tracking %d tx=%.1f", turret.lastTagId(), turret.lastTx())
                         : "not in view; holding last target");
         telemetry.addData("Ramp / gate", "%s / %s", ramp.isDeployed() ? "level" : "stowed",

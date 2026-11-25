@@ -35,6 +35,9 @@ public class MotorTest extends LinearOpMode {
                     robot.frontLeft.getCurrentPosition(), robot.frontRight.getCurrentPosition());
             telemetry.addData("BL / BR encoder", "%d / %d",
                     robot.backLeft.getCurrentPosition(), robot.backRight.getCurrentPosition());
+            telemetry.addData("Odometry digital", "left=%s right=%s",
+                    robot.odometryLeft.getState() ? "HIGH" : "LOW",
+                    robot.odometryRight.getState() ? "HIGH" : "LOW");
             if (robot.hasOdometry()) {
                 telemetry.addData("Pods forward / strafe", "%d / %d",
                         robot.forwardPodTicks(), robot.strafePodTicks());
