@@ -22,7 +22,7 @@ public final class RobotConfig {
     public static String STRAFE_POD_MOTOR_NAME = "";
 
     // ---- Backboard slide ----
-    public static int SLIDE_MAX_TICKS = 900;
+    public static int SLIDE_MAX_TICKS = 1850;
     public static int SLIDE_FLOWER_TICKS = 550;
     public static double SLIDE_KP = 0.0030;
     public static double SLIDE_MAX_POWER = 0.65;
@@ -30,17 +30,37 @@ public final class RobotConfig {
     public static int SLIDE_TOLERANCE_TICKS = 8;
 
     // ---- Turret ----
-    public static double TURRET_TICKS_PER_REVOLUTION = 537.7;
-    public static double TURRET_LIMIT_DEGREES = 360.0;
+    /** Calibrated: the prior scale showed 64 degrees over a measured 90-degree move. */
+    public static double TURRET_TICKS_PER_REVOLUTION = 1274.5;
+    /** User-reported mechanical travel measured from home: CCW is negative, CW is positive. */
+    public static final double TURRET_PHYSICAL_MIN_DEGREES = -210.0;
+    public static final double TURRET_PHYSICAL_MAX_DEGREES = 180.0;
+    /** Software limits match the user-reported mechanical endpoints. */
+    public static final double TURRET_LIMIT_MARGIN_DEGREES = 0.0;
+    public static double TURRET_MIN_DEGREES =
+            TURRET_PHYSICAL_MIN_DEGREES + TURRET_LIMIT_MARGIN_DEGREES;
+    public static double TURRET_MAX_DEGREES =
+            TURRET_PHYSICAL_MAX_DEGREES - TURRET_LIMIT_MARGIN_DEGREES;
     public static double TURRET_FLOWER_DEGREES = 45.0;
-    public static double TURRET_KP = 0.0060;
-    /** Minimum automatic power outside the target tolerance; leave at zero until measured. */
-    public static double TURRET_MIN_POWER = 0.0;
-    public static double TURRET_MAX_POWER = 0.45;
-    public static double TURRET_MANUAL_POWER = 0.30;
+    public static double TURRET_KP = 0.0058;
+    /** Measured initial breakaway value; verify it remains reliable in both directions. */
+    public static double TURRET_MIN_POWER = 0.08;
+    public static double TURRET_MAX_POWER = 1.0;
     public static double TURRET_TOLERANCE_DEGREES = 0.5;
     /** Small relative target step used by BioBuzz Tuning for proportional-response checks. */
     public static double TURRET_TEST_STEP_DEGREES = 1.0;
+    /** R2+Circle test amplitude; 210 reaches the inset targets near both asymmetric limits. */
+    public static double TURRET_TEST_FLIP_DEGREES = 210.0;
+    /** Keep the wide flip-test targets clear of hard stops while diagnosing overrun. */
+    public static final double TURRET_TEST_LIMIT_MARGIN_DEGREES = 60.0;
+    /** Maximum reference speed for every automatic and joystick-targeted turret move. */
+    public static double TURRET_PROFILE_MAX_VELOCITY_DEG_PER_SEC = 360.0;
+    /** Acceleration limit for the turret's speed-up phase, in degrees per second squared. */
+    public static double TURRET_PROFILE_ACCEL_DEG_PER_SEC_SQ = 720.0;
+    /** Lower braking acceleration gives the turret more distance to shed momentum before a target. */
+    public static double TURRET_PROFILE_BRAKE_ACCEL_DEG_PER_SEC_SQ = 190.0;
+    /** Full-stick speed for jogging the target angle; motor output remains closed-loop/profiled. */
+    public static double TURRET_MANUAL_TARGET_RATE_DEG_PER_SEC = 240.0;
 
     // ---- Limelight aiming (camera is mounted on the turret and turns with it) ----
     /** Turret degrees per degree of Limelight tx. Make it negative if the turret turns away. */
@@ -62,16 +82,15 @@ public final class RobotConfig {
     public static int BLUE_LIMELIGHT_PIPELINE = 0;
 
     // ---- Ramp and gate servos ----
-    // The left and right servos are mirrored and mechanically linked.
-    // RobotTuning pairs the ramp endpoints and sets each right target to 1.0 minus the left target.
-    public static double RAMP_LEFT_STOW = 0.14;
+    // Both ramp servos start at zero. RobotTuning adjusts the mechanically linked pair together.
+    public static double RAMP_LEFT_STOW = 0.0;
     public static double RAMP_LEFT_LEVEL = 0.483;
-    public static double RAMP_RIGHT_STOW = 0.86;
+    public static double RAMP_RIGHT_STOW = 0.0;
     public static double RAMP_RIGHT_LEVEL = 0.517;
     public static double GATE_CLOSED = 0.11;
     public static double GATE_OPEN = 0.38;
-    /** -1 leaves the hood untouched until it is calibrated; otherwise this is the saved 0..1 target. */
-    public static double HOOD_POSITION = -1.0;
+    /** Servo target for the hood: 0 is fully down and 1 is fully up. */
+    public static double HOOD_POSITION = 1.0;
 
     // ---- Launcher ----
     /** Encoder ticks per revolution of the bare motor shaft (28 for goBILDA Yellow Jacket). */

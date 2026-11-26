@@ -37,6 +37,7 @@ the ramp remains an independent mechanism.
 | [`MecanumMath.java`](src/main/java/org/firstinspires/ftc/teamcode/MecanumMath.java), [`TurretMath.java`](src/main/java/org/firstinspires/ftc/teamcode/TurretMath.java), [`FeedSequencer.java`](src/main/java/org/firstinspires/ftc/teamcode/FeedSequencer.java) | Pure logic with no hardware in it, covered by the unit tests in `src/test` |
 | [`RobotTuning.java`](src/main/java/org/firstinspires/ftc/teamcode/RobotTuning.java) | Bring-up OpMode for live numeric changes and guarded mechanism movement |
 | [`MotorTest.java`](src/main/java/org/firstinspires/ftc/teamcode/MotorTest.java) | Spins one drive wheel per button to check wiring and directions |
+| [`EncoderCheck.java`](src/main/java/org/firstinspires/ftc/teamcode/EncoderCheck.java) | Displays all eight motor encoder counts and applies short, one-at-a-time test pulses |
 | [`PedroLocalizationCheck.java`](src/main/java/org/firstinspires/ftc/teamcode/PedroLocalizationCheck.java) | Low-power manual drive-encoder calibration using PedroPathing |
 | [`PedroPathingConfig.java`](src/main/java/org/firstinspires/ftc/teamcode/PedroPathingConfig.java) | Foam-tile origin and provisional encoder scales |
 | [`PedroAutoShell.java`](src/main/java/org/firstinspires/ftc/teamcode/PedroAutoShell.java) | Disabled autonomous placeholder with no movement path |
@@ -71,32 +72,103 @@ still needs to be checked. No minimum-power threshold was measured. Repeat on a 
 then validate settings at a realistic low voltage. Keep `TURRET_MIN_POWER` at `0.0` until encoder
 feedback is confirmed to move toward the target.
 
-The launcher gate was measured at `0.11` closed (blocks balls) and `0.38` open. The hood's command
-range is `0.0` down to `1.0` up, but its preferred operating target is not yet calibrated. Ramp
-endpoints still need final mechanical verification; other configuration values remain estimates.
+The launcher gate was measured at `0.11` closed (blocks balls) and `0.38` open. The user confirmed
+the hood range is `0.0` fully down to `1.0` maximum up; `1.0` is the requested startup position,
+while the shooting angle remains uncalibrated. Ramp endpoints still need final mechanical
+verification; other configuration values remain estimates.
 
-**2026-11-25 — Tuning diagnostics and one-controller input (local build only):** The telemetry
-separates turret target, measured angle, error, encoder ticks, and normalized power request. The
-tuner now runs from Gamepad 1 alone; Gamepad 2 is not needed. `:TeamCode:testDebugUnitTest` passed
-all 24 tests (8 each for feed sequencing, mecanum math, and turret math), and
-`:TeamCode:assembleDebug` succeeded. These changes have not yet been uploaded to OnBotJava; deploy
-and use **Build Everything** after the robot is stopped and its battery is charged. Do not install
-the debug APK over the FTC Robot Controller app because of its signature mismatch.
+**2026-11-25 — Tuning and Android Studio deployment:** The telemetry separates turret target,
+measured angle, error, encoder ticks, profile speed, and normalized power request. The tuner runs
+from Gamepad 1 alone. `:TeamCode:assembleDebug` builds the Robot Controller APK, and ADB installs it
+on the Control Hub; see [TeamCode README](README.md#build-and-deploy-with-adb) for the PowerShell
+commands. The first switch from the stock FTC-signed app required a one-time uninstall because the
+signatures differed. Later APKs using the same project key install with `adb install -r`. During the
+first replacement on this robot, its SSID remained `20037-RC` and ADB stayed connected, so verify
+the network after replacement instead of assuming its credentials reset. The project source is now
+the Android Studio workspace; OnBotJava **Build Everything** is not part of this deployment path.
 
-**2026-11-25 — Hub connection check:** The existing OnBotJava page at `192.168.43.1:8080` reported
-**Robot Controller disconnected** and files read-only. The Hub project lists the tuning and Pedro
-source files, but the current workspace updates are not deployed. Resume upload and physical tests
-after the Hub is back online and the battery is charged.
+**2026-11-25 — Historical OnBotJava connection check:** The old OnBotJava page at `192.168.43.1:8080` reported **Robot Controller disconnected** and files read-only. That check applied to the previous OnBotJava workflow; the active project deployment path is the Android Studio APK installed through ADB, documented in `TeamCode/README.md`.
 
-**2026-11-25 — Control Hub startup failure:** The user clarified that the Robot Controller app
-opened and displayed its network status, then failed during its own **Initializing Robot** startup
-phase, before any OpMode was selected or run. This began after a power cycle; a full Android factory
-reset stopped the failure. The pre-reset crash log was not preserved, so the original cause is
-unknown. The `backboardSlides` name observed while restoring the hardware configuration was entered
-after that reset and is unrelated to the earlier failure. Before the reset, the OnBotJava project
-also contained a legacy `MarkII.java` file absent from this workspace; the exact set of compiled
-OnBotJava classes at the time of failure is unknown. No OpMode has been run since the reset. If the
-startup failure recurs, capture the Control Hub log before resetting it.
+**2026-11-25 — Turret endpoint correction:** The user confirmed the software stops should match the
+The user originally reported -210 degrees CCW and +90 degrees CW, then corrected the positive mechanical endpoint to +180 degrees.
+Current workspace software limits use -210 and +180 degrees with no margin. The Hub readback confirmed the file saved.
+The user confirmed no OpMode was running, then OnBotJava Build Everything succeeded in 6.8 seconds.
+The angle-to-encoder scale still needs physical validation, because any scale or zero error moves the effective physical stop.
+
+**2026-11-25 — Control Hub startup failure (post-reset recurrence diagnosed and fixed):** The
+Robot Controller app reached **Initializing Robot** and failed before any OpMode was selected or
+run. Logcat captured an uncaught `NoClassDefFoundError` in
+`FetchAutocompleteJavaScript.parseClassForAutocomplete`. The Control Hub v1.0 runs Android 7.1.2/API
+25; PedroPathing 2.1.2's Kotlin stdlib 2.1.20 external library included optional `kotlin.io.path`
+methods that reference `java.nio.file.Path`, plus `kotlin.time.jdk8` conversions that reference
+`java.time.Duration` and `java.time.Instant`. Those platform types are absent on API 25. OnBotJava
+12 reflects external-library method signatures for `/java/js/editor/autocomplete`; the missing
+types caused an uncaught exception that killed the Robot Controller process, after which RobotCore
+reported `EMERGENCY STOP, unable to start robot`. The earlier partial filter removed only
+`kotlin.io.path`, which is why the next captured exception named `java.time.Duration`. The separate
+`META-INF.versions.9.module-info` class lookup was caught during startup and was not the fatal error.
+
+The Hub now has an API 25-compatible Kotlin JAR and matching DEX. The filter removes
+`kotlin/io/path/**`, `kotlin/time/jdk8/DurationConversionsJDK8Kt.class`,
+`kotlin/time/jdk8/InstantConversionsJDK8Kt.class`, and `META-INF/versions/**`; the JAR manifest no
+longer declares `Multi-Release`. The DEX was built for min API 25 and is DEX version 037. The active
+files are `/sdcard/FIRST/ExternalLibraries/kotlin_stdlib_2_1_20.jar` and
+`/sdcard/FIRST/ExternalLibraries/kotlin_stdlib_2_1_20_jar/dex/classes.dex`. A pre-fix copy is at
+`/sdcard/FIRST/ExternalLibraries_backup_2026-11-25/before_api25_compat_fix/`; the original Maven
+JAR and DEX are also preserved in the surrounding backup directory. Do not replace the active pair
+with the unfiltered Kotlin 2.1.20 JAR.
+
+After the replacement, RobotCore reported `running`; three consecutive requests to the autocomplete
+endpoint returned HTTP 200, and the same Robot Controller process remained alive for at least 45
+seconds without another fatal exception. No OpMode was selected or run during this repair. The
+pre-reset crash log was not preserved, so this cause is confirmed for the post-reset recurrence and
+consistent with, but cannot conclusively prove, the earlier loop. The `backboardSlides` name was
+entered after the factory reset and is unrelated. The legacy `MarkII.java` file was not involved in
+the captured fatal stack.
+
+After a full Control Hub power cycle, ADB over Wi-Fi confirmed the filtered JAR and DEX were still
+present. A new Robot Controller process loaded the hardware configuration, including `backboardSlide`,
+`frontLeft`, `turret`, `launcherGate`, and `limelight`; `EventLoopManager` reached `RUNNING` and
+RobotCore reported `running`. The current OpMode remained `$Stop$Robot$`, and the captured post-boot
+log contained no `FATAL EXCEPTION` or `NoClassDefFoundError`. This confirms the fix survives the
+power cycle that had triggered the startup loop. No OpMode was run and no motors were commanded.
+
+**2026-11-25 — Startup positions and elevator direction:** The requested startup ramp targets are
+now `0.0` for both servos; the launcher gate remains open through INIT and active start, and the
+hood starts at `1.0` (maximum up). After the user reported that stick-up moved the backboard slide
+down, `backboardSlide` was set to `REVERSE` so positive power and encoder counts should mean
+extension. `RobotConfig.java`, `RobotHardware.java`, `Shooter.java`, and `RobotTuning.java` were
+synced to OnBotJava and **Build Everything** succeeded. The reversed slide direction still needs a
+short physical jog confirmation; no OpMode or mechanism was run after this build.
+
+**2026-11-25 — Slide endpoint and turret encoder:** The user measured slide home at `0` ticks and
+the raised endpoint at `1850` ticks, with a small clearance; `SLIDE_MAX_TICKS` is now set to `1850`.
+The user also reported that turret encoder ticks remain unchanged while the turret moves. This
+leaves turret angle and its software limits untrustworthy; do not tune or command automatic turret
+targets until the encoder signal is restored and confirmed.
+
+**2026-11-25 — Turret encoder restored and initial tuning:** The user reports the turret encoder is
+working. A rough measurement was about `315` ticks over an estimated `90°`, but the user is unsure
+of the angle accuracy. The CAD pulley sizes are 24 teeth on the drive pulley and 80 teeth around
+the turret, giving `80 / 24 = 3.333` drive-pulley revolutions per turret revolution. Using the
+existing `537.7` motor-tick/revolution estimate gives a trial CAD scale of `537.7 * 80 / 24 =
+1792.3` ticks per turret revolution. This predicts about `448` ticks per turret quarter-turn; the
+rough `315` reading would correspond to about `63°` at this scale. The user measured
+`TURRET_MIN_POWER = 0.08` and selected `TURRET_KP = 0.0058`. Verify the CAD-derived scale with a
+measured physical angle before relying on turret targets or limits; the turret's safe physical limits
+also need verification.
+
+**2026-11-25 -- Turret scale corrected:** The user measured a physical `90` degree turret move while
+the prior `1792.3` ticks/revolution scale displayed `64` degrees. Correcting with
+`oldScale * displayed / measured` gives `1792.3 * 64 / 90 = 1274.5` ticks per turret revolution.
+This corresponds to about `319` ticks per `90` degrees and `3.54` ticks per degree. The earlier
+CAD-derived scale is superseded. Recheck a small move from home and confirm direction before
+expanding the turret test range.
+
+`EncoderCheck` can be used after reseating the encoder leads with power off. It does not reset motor
+encoders or move servos. It reports raw counts for the four drive motors, intake, launcher, slide,
+and turret, and gives only the selected motor a 0.18-power pulse for 0.20 seconds. The robot must be
+supported with the drive wheels clear; keep the launcher, slide, turret, and intake paths clear.
 
 The unit tests run on a laptop without a robot: in Android Studio, right-click
 `TeamCode/src/test` and choose Run Tests, or run `./gradlew :TeamCode:testDebugUnitTest`.
@@ -147,12 +219,12 @@ Robot Configuration as `limelight`.
 | `backRight` | `DcMotorEx` | Direction reversed; `RUN_WITHOUT_ENCODER` | Mecanum drive |
 | `intake` | `DcMotorEx` | `RUN_WITHOUT_ENCODER` | Runs during each feed pulse |
 | `turret` | `DcMotorEx` | Encoder reset on first init, then `RUN_USING_ENCODER`; brakes at zero power | Aiming and Flower rotation |
-| `backboardSlide` | `DcMotorEx` | Encoder reset on first init, then `RUN_USING_ENCODER`; brakes at zero power | Slide position and manual motion |
+| `backboardSlide` | `DcMotorEx` | Reversed direction; encoder reset on first init, then `RUN_USING_ENCODER`; brakes at zero power | Slide position and manual motion; positive ticks mean extension |
 | `launcher` | `DcMotorEx` | `RUN_USING_ENCODER`; zero-power behavior `FLOAT` (coasts) | Launcher velocity control |
-| `rampLeft` | `Servo` | Commanded to `RAMP_LEFT_STOW`; paired with the mirrored right target | Left side of ramp |
-| `rampRight` | `Servo` | Commanded to `RAMP_RIGHT_STOW`; paired with the mirrored left target | Right side of ramp |
-| `launcherGate` | `Servo` | Starts at `GATE_OPEN` during INIT; closes to `GATE_CLOSED` after start unless feeding | Ball gate |
-| `hood` | `Servo` | Uses `HOOD_POSITION` only after calibration; target range is 0 through 1 | Hood mechanism |
+| `rampLeft` | `Servo` | Starts at `RAMP_LEFT_STOW` (`0.0`) | Left side of ramp |
+| `rampRight` | `Servo` | Starts at `RAMP_RIGHT_STOW` (`0.0`) | Right side of ramp |
+| `launcherGate` | `Servo` | Starts at `GATE_OPEN` during INIT and stays open through the active start until a gate command or feed request | Ball gate |
+| `hood` | `Servo` | Starts at `HOOD_POSITION` (`1.0`, maximum up) during INIT; range is 0 down to 1 up | Hood mechanism |
 | `odometryLeft` | `DigitalChannel` | Configured as `INPUT`; not decoded | Left odometry pod signal |
 | `odometryRight` | `DigitalChannel` | Configured as `INPUT`; not decoded | Right odometry pod signal |
 | `imu` | `IMU` | Logo up, USB forward; yaw reset at TeleOp start | Field centric drive heading |
@@ -194,10 +266,7 @@ encoder-based bounds are wrong. To fix it, move both to home and press Gamepad 1
 TeleOp init, which zeroes them again. The init screen shows the current readings and whether the
 zero was set in this init or kept from earlier. `BioBuzz Tuning` always re-zeroes when it starts.
 
-The current slide and turret limits are software checks. They do not detect a jam or protect against
-encoder failure, incorrect motor polarity, loose couplings, or inertia past the boundary. The slide
-has no programmed extension switch. The turret's ±360° limit assumes the encoder count maps correctly
-to turret output angle.
+The current slide and turret limits are software checks. They do not detect a jam or protect against encoder failure, incorrect motor polarity, loose couplings, or inertia past the boundary. The slide has no programmed extension switch. User-reported turret mechanical travel and exact software bounds are -210 degrees counterclockwise and +180 degrees clockwise from home. Flip-test destinations stay 60 degrees inside those bounds at -150 and +120 degrees; verify encoder zero and scale before moving there.
 
 ## Driver controls
 
@@ -227,7 +296,7 @@ coordinate frame.
 | `LB` | Toggle Flower mode, subject to the time lockout when turning it on |
 | `RB` | Toggle ramp between CAD stow and level/deployed targets |
 | Hold left stick button + left stick Y | Manually extend/retract the slide |
-| Hold left stick button + right stick X | Manually turn the turret |
+| Hold left stick button + right stick X | Jog the turret angle target; the controller moves and holds it |
 | Hold left stick button + D-pad up/down | Command ramp level/stow |
 | Hold left stick button + D-pad right/left | Open/close the gate; opening requires launcher-ready speed |
 | `Back` | Cancel remaining feeds, close the gate, stop intake, and let the launcher coast down |
@@ -236,9 +305,11 @@ An analog stick movement or D-pad command while manual control is enabled cancel
 sequence. Cancelling a sequence does not turn the launcher off; `Back` does. A newly selected ball
 sequence replaces the current remaining count rather than appending to it.
 
-After a manual slide or turret move, the mechanism holds where it was released. The turret then
-moves again when the Limelight sees the goal tag (outside Flower mode); the slide stays put until
-Flower is toggled.
+After a manual slide or turret move, the mechanism holds where it was released. The turret stick
+changes the requested angle at a configured rate; it never commands raw motor power. The same
+profiled encoder controller moves the turret in manual, preset, and Limelight modes. When the manual
+control button is released, Limelight aiming can take over again outside Flower mode; the slide
+stays put until Flower is toggled.
 
 ## Runtime behavior
 
@@ -284,11 +355,16 @@ Flower off is always allowed. Ramp state is independent.
 ### Turret and Limelight
 
 Turret angle is computed from encoder ticks using `TURRET_TICKS_PER_REVOLUTION`, interpreted as
-encoder ticks per full turret output revolution. Every target is kept within ±
-`TURRET_LIMIT_DEGREES`. A target just past a limit is replaced by the same direction one full turn
-back (365° becomes 5°) when that fits inside the limits, so the turret unwinds directly onto the
-target; otherwise the target stops at the limit. Power that would push further past a limit is
-blocked, for manual and automatic motion alike.
+encoder ticks per full turret output revolution. Every automatic target move uses an acceleration
+limited trapezoidal profile: it ramps speed up, cruises when the move is long enough, and brakes
+according to the remaining stopping distance. Encoder position feedback corrects tracking error.
+This same controller runs for manual angle jogging, presets, and Limelight aiming. The manual stick
+changes the target angle at `TURRET_MANUAL_TARGET_RATE_DEG_PER_SEC`; releasing it holds that angle.
+
+Targets are kept within asymmetric software bounds. A target just past a limit is replaced by the
+same direction one full turn back when that equivalent angle fits inside the bounds; otherwise the
+target stops at the nearer bound. Power that would push farther past either bound is blocked. The
+    User-reported mechanical travel is -210 degrees counterclockwise to +180 degrees clockwise; software limits match both endpoints. Wide flip-test targets stay 60 degrees inside at -150 and +120 degrees.
 
 The Limelight is mounted on the turret and turns with it. While not in Flower mode or manual turret
 control, the OpMode inspects fiducials in the latest valid Limelight result. Only tags whose ID is
@@ -325,9 +401,10 @@ both outputs together. The current endpoints (`0.14/0.86` stow and `0.483/0.517`
 provisional until the horns are re-indexed and the mechanism is checked through its full motion.
 All commands are clamped to 0 through 1.
 
-The gate starts at `GATE_OPEN` (`0.38`) during INIT. It uses `GATE_CLOSED` (`0.11`) during normal
-idle and after the OpMode stops. Normal TeleOp and timed feeding retain the launcher-ready check.
-In `BioBuzz Tuning`, Circle manually opens the gate at any RPM for position testing; releasing it
+The gate starts at `GATE_OPEN` (`0.38`) during INIT and remains open through the active start until
+a gate command or feed request takes control. It uses `GATE_CLOSED` (`0.11`) when closed and after
+the OpMode stops. Normal TeleOp and timed feeding retain the launcher-ready check. In
+`BioBuzz Tuning`, Circle manually opens the gate at any RPM for position testing; releasing it
 returns the gate to the closed target. No gate position sensor is mapped.
 
 ### Launcher and feed sequence
@@ -375,24 +452,31 @@ claim about the final robot.
 | `SLIDE_MAX_POWER` | `0.65` | Automatic slide power cap |
 | `SLIDE_MANUAL_POWER` | `0.45` | Manual slide power scale |
 | `SLIDE_TOLERANCE_TICKS` | `8` | Error below which the slide stops driving |
-| `TURRET_TICKS_PER_REVOLUTION` | `537.7` | Turret output encoder ticks per 360° |
-| `TURRET_LIMIT_DEGREES` | `360` | Turret soft limit in either direction |
+| `TURRET_TICKS_PER_REVOLUTION` | `1274.5` | Calibrated from 64 degrees indicated for a measured 90-degree turret move |
+| `TURRET_PHYSICAL_MIN_DEGREES`, `TURRET_PHYSICAL_MAX_DEGREES` | `-210`, `180` | Reported travel from home; negative is counterclockwise |
+| `TURRET_LIMIT_MARGIN_DEGREES` | `0` | No software margin inside the reported endpoints |
+| `TURRET_MIN_DEGREES`, `TURRET_MAX_DEGREES` | `-210`, `180` | Software limits match the reported CCW/CW endpoints exactly |
 | `TURRET_FLOWER_DEGREES` | `45` | Flower turret target relative to home |
-| `TURRET_KP` | `0.0060` | Turret power per degree of target error |
-| `TURRET_MIN_POWER` | `0.0` | Minimum automatic output outside tolerance; zero until measured |
-| `TURRET_MAX_POWER` | `0.45` | Automatic turret power cap |
-| `TURRET_MANUAL_POWER` | `0.30` | Manual turret power scale |
+| `TURRET_KP` | `0.0058` | Turret power per degree of profile-position error |
+| `TURRET_MIN_POWER` | `0.08` | Measured initial minimum automatic output outside tolerance |
+| `TURRET_MAX_POWER` | `1.0` | Output cap for the profiled turret controller |
 | `TURRET_TOLERANCE_DEGREES` | `0.5` | Error below which the turret stops driving |
 | `TURRET_TEST_STEP_DEGREES` | `1.0` | Relative target step for the tuning OpMode |
+| `TURRET_TEST_FLIP_DEGREES` | `210.0` | R2+Circle flip amplitude; large enough to reach the 60-degree-inset test targets |
+| `TURRET_TEST_LIMIT_MARGIN_DEGREES` | `60.0` | Test-target inset from each software limit; software limits remain unchanged |
+| `TURRET_PROFILE_MAX_VELOCITY_DEG_PER_SEC` | `360` | Maximum profiled speed in every automatic mode |
+| `TURRET_PROFILE_ACCEL_DEG_PER_SEC_SQ` | `720` | Acceleration limit while speeding up |
+| `TURRET_PROFILE_BRAKE_ACCEL_DEG_PER_SEC_SQ` | `190` | Deceleration used to plan earlier braking |
+| `TURRET_MANUAL_TARGET_RATE_DEG_PER_SEC` | `240` | Target-angle change per second at full stick input |
 | `LIMELIGHT_AIM_GAIN` | `1.0` | Multiplier from Limelight `tx` degrees to turret target degrees; negative reverses it |
 | `LIMELIGHT_MAX_STALENESS_MS` | `250` | Camera frames older than this are ignored |
 | `RED_TAG_MIN_ID`, `RED_TAG_MAX_ID` | `30`, `37` | AprilTag IDs the turret aims at on Red |
 | `BLUE_TAG_MIN_ID`, `BLUE_TAG_MAX_ID` | `38`, `45` | AprilTag IDs the turret aims at on Blue |
 | `RED_LIMELIGHT_PIPELINE`, `BLUE_LIMELIGHT_PIPELINE` | `0`, `0` | Limelight pipeline indexes |
-| `RAMP_LEFT_STOW`, `RAMP_LEFT_LEVEL` | `0.14`, `0.483` | Left reference values for paired ramp targets |
-| `RAMP_RIGHT_STOW`, `RAMP_RIGHT_LEVEL` | `0.86`, `0.517` | Mirrored right ramp targets |
+| `RAMP_LEFT_STOW`, `RAMP_LEFT_LEVEL` | `0.0`, `0.483` | Left startup and level targets; startup is zero |
+| `RAMP_RIGHT_STOW`, `RAMP_RIGHT_LEVEL` | `0.0`, `0.517` | Right startup and level targets; startup is zero |
 | `GATE_CLOSED`, `GATE_OPEN` | `0.11`, `0.38` | Measured gate endpoints |
-| `HOOD_POSITION` | `-1.0` | Hood starting target; -1 = no startup target; tuning range is 0 down to 1 up |
+| `HOOD_POSITION` | `1.0` | Hood startup target (maximum up); tuning range is 0 down to 1 up |
 | `LAUNCHER_TICKS_PER_REVOLUTION` | `28` | Launcher encoder ticks per bare motor-shaft revolution |
 | `LAUNCHER_GEAR_RATIO` | `1.0` | Launcher gearbox ratio; `1.0` = RPM values are motor-shaft RPM |
 | `LAUNCHER_TARGET_RPM` | `3000` | Launcher speed held while spinning |
@@ -404,12 +488,13 @@ claim about the final robot.
 | `TELEOP_DURATION_SECONDS` | `120` | Match time basis for lockout calculation |
 | `FLOWER_UNLOCK_REMAINING_SECONDS` | `60` | Remaining-time threshold for Flower |
 
-`RobotTuning` can adjust slide limits/gain, turret encoder ratio, limits, proportional gain, minimum
-and maximum power, manual power, tolerance, test step, Flower target, paired ramp and gate endpoints,
-launcher ratio/target RPM, and feed timings. It provides a hood jog over 0..1 and a gate test that
-does not require launcher RPM. The tuner displays assignments to copy back into the config file.
-Its encoder displays are useful for measuring travel: record home and endpoint ticks, then calculate
-limits from the measured change rather than relying on the initial estimates.
+`RobotTuning` can adjust slide limits/gain, turret encoder ratio, asymmetric turret limits, position
+gain, minimum and maximum power, profile velocity, acceleration and braking, manual target rate, flip angle, tolerance,
+test step, Flower target, paired ramp and gate endpoints, launcher ratio/target RPM, and feed timings.
+It provides a hood jog over 0..1 and a gate test that does not require launcher RPM. The tuner
+displays assignments to copy back into the config file. Its encoder displays are useful for
+measuring travel: record home and endpoint ticks, then calculate limits from the measured change
+rather than relying on the initial estimates.
 
 ### `BioBuzz Tuning` controls (Gamepad 1 only)
 
@@ -422,19 +507,28 @@ testing from the D-pad controls for selecting and changing settings.
 | Change selected setting | D-pad left/right |
 | Choose fine or coarse adjustment | Hold `X` for 0.1x; hold `Y` for 10x; otherwise 1x |
 | Step turret target | Hold right trigger and tap D-pad left/right |
+| Flip between two test angles | Hold right trigger and tap Circle; default targets are 60 degrees inside the limits (`-150` and `+120`) |
 | Return turret target to zero | Hold right trigger and tap D-pad up |
-| Jog slide | Hold left stick button and move left stick |
-| Jog turret manually | Hold right stick button and move right stick X |
+| Jog slide | Press and hold the left stick down while moving the left stick |
+| Jog turret angle | Press and hold the right stick down while moving right stick X; the controller moves and holds the target |
 | Jog mirrored ramp pair | Hold `LB` or `RB` and move right stick Y; both targets change together |
 | Jog hood | Hold left trigger and move right stick Y; 0 is down and 1 is up |
 | Spin launcher | Hold `A`; releasing it stops drive power and the wheel coasts |
-| Test gate open | Hold `B`; tuning opens it at any RPM, release to close |
+| Test gate open | Hold `B` without right trigger; tuning opens it at any RPM, release to close |
+
+On the PS5-style controller used here, Cross maps to FTC `A`, Circle to `B`, Square to `X`, and
+Triangle to `Y`; `R2` is the right trigger.
 
 For `TURRET_MIN_POWER`, a normal D-pad increment is 0.01, `X` makes it 0.001, and `Y` makes it
-0.1. Use `X` for the breakaway test. `RobotTuning` re-zeroes the slide and turret every time it
-starts, so place both at their home positions before selecting it. Values changed in the tuner are
-live only until the Robot Controller app restarts; copy the displayed `RobotConfig` assignment into
-the source to store a calibration.
+0.1. Use `X` for fine changes. `RobotTuning` re-zeroes the slide and turret every time it starts,
+so place both at their home positions before selecting it. Values changed in the tuner are live only
+until the Robot Controller app restarts; copy the displayed `RobotConfig` assignment into the source
+to store a calibration. With right trigger held, Circle is the turret flip command and does not
+open the gate.
+
+For `TURRET_PROFILE_BRAKE_ACCEL_DEG_PER_SEC_SQ`, a normal D-pad tap changes it by `10`, `X` changes
+it by `1`, and `Y` by `100`. Lower values make the profile begin braking earlier while preserving
+the separate speed-up acceleration and maximum velocity.
 
 ## Tuning and commissioning sequence
 
@@ -444,40 +538,45 @@ the source to store a calibration.
 2. **Check configuration.** Confirm all required hardware names and SDK device classes above.
    Compare them with the recorded hub port layout, then confirm the IMU orientation, motor wiring,
    servo ports, and Limelight connection. The camera may be absent during mechanical bring-up.
-3. **Deploy the bring-up sources.** After the Control Hub is powered back on, update
-   `RobotTuning.java`, `Turret.java`, `PedroLocalizationCheck.java`, and `PedroPathingConfig.java`
-   in OnBotJava, then press **Build Everything**. The debug APK builds locally, but cannot replace
-   the installed FTC app because their signatures differ.
+3. **Build and deploy.** Stop the OpMode, connect to the Control Hub over USB or Wi-Fi ADB, then
+   follow the PowerShell build and install commands in [TeamCode README](README.md#build-and-deploy-with-adb).
+   The first install over the stock FTC-signed app needs a one-time uninstall if Android reports a
+   signing conflict; preserve the project signing key so later installs use `adb install -r`.
+   Confirm the Robot Controller app starts and the Driver Station reconnects after installation.
 4. **Establish references.** With power removed or mechanisms safely supported, place the slide at
    full retraction and turret at the defined home angle before the first init after the app
    starts. `BioBuzz Tuning` re-zeroes them on each start, so do this every time before selecting
    the OpMode. Check that both encoder readings are zero before moving either mechanism.
 5. **Check drive polarity.** The raised-wheel `Motor Test` now passes for all four wheels. Still
    check each stick direction and field centric mode at low power before normal floor driving.
-6. **Check servo starting positions.** With the one-controller map above, jog the mirrored ramp pair
-   with `LB`/`RB` and right stick Y. Jog the hood with left trigger and right stick Y. Move a little
-   at a time, stop before any linkage binds, and record the usable positions. Copy the paired ramp
-   and hood values into `RobotConfig` after confirming their mechanical range.
+6. **Check servo starting positions.** The hood range is confirmed as `0.0` down and `1.0` maximum
+   up; it should start at `1.0`. Ramp calibration is deferred until its horns are re-indexed. When
+   resuming it, use the one-controller map above to jog the mirrored pair with `LB`/`RB` and right
+   stick Y, moving only a little at a time and stopping before any linkage binds.
 7. **Measure slide travel.** Hold the left stick button and use the left stick at low manual power.
    Check that extension increases the encoder count. Record home and the safe extension endpoint;
    set `SLIDE_MAX_TICKS` below the measured mechanical endpoint. Verify Flower extension and
    retraction have clearance before trying automatic moves.
-8. **Measure turret ratio, minimum power, and signs.** Start near the defined home angle, keep the
-   mechanism clear, and leave `TURRET_KP` unchanged while finding breakaway power. A one-degree
-   target is only about 1.5 encoder ticks at the current 537.7 ticks/revolution estimate, so watch
-   `Turret encoder ticks` and `Turret power request / minimum`, not just the rounded angle. In
-   `BioBuzz Tuning`, hold right trigger and tap D-pad right once for a one-degree target, then hold
-   right trigger and tap D-pad up to return to zero. Repeat on the left side and confirm the encoder
-   moves in the expected direction. If neither side registers movement, select `TURRET_MIN_POWER`,
-   hold `X`, and tap D-pad right once per retry; this raises the minimum by 0.001 each time. Record
-   the lowest setting that moves consistently in both directions, then copy the reported assignment
-   into `RobotConfig.java`.
-   Stop and inspect the wiring, encoder, or mechanism if the requested power rises noticeably but
-   the tick count still does not change. After the ratio and sign are confirmed, tune `TURRET_KP`
-   separately using small target steps and inspect for overshoot or repeated oscillation. Only then
-   test the soft limits and return-to-home behavior with a spotter. The 537.7 ticks/revolution value
-   is still an estimate until a measured turret rotation confirms it.
-9. **Calibrate the launcher and gate.** Hold `A` with the wheel clear and no game piece loaded;
+8. **Verify turret calibration and response.** The corrected scale is `1274.5` ticks/revolution,
+   based on a measured 90-degree turret move that displayed 64 degrees at the previous setting. It
+   predicts about `319` ticks per quarter-turn and `35` ticks per 10 degrees. The current minimum
+   power is `0.08` and Kp is `0.0058`. The profile uses 360 degrees/second maximum velocity,
+   720 degrees/second-squared speed-up acceleration, and 190 degrees/second-squared braking.
+   R2+Circle now flips between `-150` and `+120` degrees, 60 degrees inside the exact
+   software limits of -210 and +180 degrees. Confirm the home zero, encoder scale, direction, and cable
+   clearance before using this wide test. Watch actual and target angles, profile speed, error, and
+   power request; stop if motion is reversed, binds, or overshoots.
+
+   The planned stopping distance is `speed^2 / (2 * braking acceleration)`. At 360 degrees/second
+   and 190 degrees/second-squared, it is about 341 degrees. The 270-degree test sweep should peak
+   near 285 degrees/second and brake without a cruise segment. Speed-up remains 720
+   degrees/second-squared; Kp remains 0.0058. A short move will not reach the speed cap.
+
+   If it still overshoots, capture the peak angle, measured speed, profile speed, and power request
+   before changing another setting. Keep `TURRET_MIN_POWER = 0.08` for this run so the braking
+   profile is the only changed value. Copy the displayed assignment into `RobotConfig.java` after
+   validating it in both directions.
+ 9. **Calibrate the launcher and gate.** Hold `A` with the wheel clear and no game piece loaded;
    watch RPM and ready status. Tune the target and encoder ratio from measured behavior, not the
    starting estimates. Hold `B` only after ready status to verify the gate opens and closes. Once
    that passes, stop Tuning and use `BioBuzz TeleOp` to test one feed pulse with one game piece;

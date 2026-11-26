@@ -33,10 +33,19 @@ public class TurretMathTest {
     }
 
     @Test
+    public void asymmetricTargetsUseTheReportedNegativeAndPositiveLimits() {
+        assertEquals(80.0, TurretMath.boundTarget(100.0, -200.0, 80.0), EPS);
+        assertEquals(-200.0, TurretMath.boundTarget(-220.0, -200.0, 80.0), EPS);
+        assertEquals(-90.0, TurretMath.boundTarget(270.0, -200.0, 80.0), EPS);
+        assertEquals(60.0, TurretMath.boundTarget(-300.0, -200.0, 80.0), EPS);
+    }
+
+    @Test
     public void aimTargetAddsTheTagOffsetToTheCurrentAngle() {
         assertEquals(40.0, TurretMath.aimTarget(30.0, 10.0, 1.0, 360.0), EPS);
         assertEquals(20.0, TurretMath.aimTarget(30.0, 10.0, -1.0, 360.0), EPS);
         assertEquals(10.0, TurretMath.aimTarget(355.0, 15.0, 1.0, 360.0), EPS);
+        assertEquals(80.0, TurretMath.aimTarget(70.0, 30.0, 1.0, -200.0, 80.0), EPS);
     }
 
     @Test
@@ -45,6 +54,14 @@ public class TurretMathTest {
         assertEquals(-0.3, TurretMath.limitPower(-0.3, 360.0, 360.0), EPS);
         assertEquals(0.0, TurretMath.limitPower(-0.3, -361.0, 360.0), EPS);
         assertEquals(0.3, TurretMath.limitPower(0.3, 100.0, 360.0), EPS);
+    }
+
+    @Test
+    public void powerRespectsAsymmetricTurretLimits() {
+        assertEquals(0.0, TurretMath.limitPower(0.3, 80.0, -200.0, 80.0), EPS);
+        assertEquals(-0.3, TurretMath.limitPower(-0.3, 80.0, -200.0, 80.0), EPS);
+        assertEquals(0.0, TurretMath.limitPower(-0.3, -200.0, -200.0, 80.0), EPS);
+        assertEquals(0.3, TurretMath.limitPower(0.3, -200.0, -200.0, 80.0), EPS);
     }
 
     @Test

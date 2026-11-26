@@ -108,6 +108,9 @@ public final class RobotHardware {
         frontRight.setDirection(DcMotor.Direction.REVERSE);
         backLeft.setDirection(DcMotor.Direction.REVERSE);
         backRight.setDirection(DcMotor.Direction.REVERSE);
+        // The raised elevator moves downward under positive power with the default direction.
+        // Reverse it so positive joystick input and encoder ticks mean upward extension.
+        backboardSlide.setDirection(DcMotor.Direction.REVERSE);
         for (DcMotorEx motor : new DcMotorEx[] {frontLeft, frontRight, backLeft, backRight}) {
             motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -136,7 +139,8 @@ public final class RobotHardware {
         stopAllMotors();
         rampLeft.setPosition(RobotConfig.RAMP_LEFT_STOW);
         rampRight.setPosition(RobotConfig.RAMP_RIGHT_STOW);
-        // Start open during INIT; Shooter.update() moves it to GATE_CLOSED after start.
+        // Start open during INIT; Shooter keeps it open through the active start until a gate
+        // command or feed request takes control.
         launcherGate.setPosition(Ramp.clamp01(RobotConfig.GATE_OPEN));
         if (RobotConfig.HOOD_POSITION >= 0.0 && RobotConfig.HOOD_POSITION <= 1.0) {
             hood.setPosition(RobotConfig.HOOD_POSITION);

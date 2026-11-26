@@ -181,13 +181,14 @@ public class BioBuzzTeleOp extends LinearOpMode {
             slide.update();
         }
 
-        if (turretStick != 0.0) {
+        if (manualEnabled) {
             turret.manual(turretStick);
-        } else {
+        } else if (!flowerMode) {
             // Flower mode owns the turret target; otherwise the Limelight does.
-            if (!flowerMode) turret.trackTag(minTagId(), maxTagId());
-            turret.update();
+            turret.trackTag(minTagId(), maxTagId());
         }
+        // Manual stick input changes the angle target; every mode uses the same profiled controller.
+        turret.update();
     }
 
     private void updateShooter(double nowSeconds) {
@@ -216,8 +217,9 @@ public class BioBuzzTeleOp extends LinearOpMode {
         telemetry.addData("Match time remaining", "%.1f s", remaining);
         telemetry.addData("Slide", "%d ticks, target %d, max %d", slide.position(),
                 slide.target(), RobotConfig.SLIDE_MAX_TICKS);
-        telemetry.addData("Turret", "%.1f deg, target %.1f, limit %.1f", turret.degrees(),
-                turret.target(), RobotConfig.TURRET_LIMIT_DEGREES);
+        telemetry.addData("Turret", "%.1f deg, target %.1f, limits [%.0f, %.0f]",
+                turret.degrees(), turret.target(), RobotConfig.TURRET_MIN_DEGREES,
+                RobotConfig.TURRET_MAX_DEGREES);
         telemetry.addData("Goal tag", "IDs %d-%d, %s", minTagId(), maxTagId(),
                 robot.limelight == null ? "Limelight not configured"
                         : turret.tagVisible()
